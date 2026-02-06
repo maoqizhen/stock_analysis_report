@@ -20,7 +20,11 @@ from dataclasses import dataclass, field
 def setup_env():
     """初始化环境变量（支持从 .env 加载）"""
     # src/config.py -> src/ -> root
-    env_path = Path(__file__).parent.parent / '.env'
+    env_file = os.getenv("ENV_FILE")
+    if env_file:
+        env_path = Path(env_file)
+    else:
+        env_path = Path(__file__).parent.parent / '.env'
     load_dotenv(dotenv_path=env_path)
 
 
@@ -66,6 +70,7 @@ class Config:
     # === 搜索引擎配置（支持多 Key 负载均衡）===
     bocha_api_keys: List[str] = field(default_factory=list)  # Bocha API Keys
     tavily_api_keys: List[str] = field(default_factory=list)  # Tavily API Keys
+    brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     
     # === 通知配置（可同时配置多个，全部推送）===
@@ -306,6 +311,9 @@ class Config:
         serpapi_keys_str = os.getenv('SERPAPI_API_KEYS', '')
         serpapi_keys = [k.strip() for k in serpapi_keys_str.split(',') if k.strip()]
 
+        brave_keys_str = os.getenv('BRAVE_API_KEYS', '')
+        brave_api_keys = [k.strip() for k in brave_keys_str.split(',') if k.strip()]
+
         # 企微消息类型与最大字节数逻辑
         wechat_msg_type = os.getenv('WECHAT_MSG_TYPE', 'markdown')
         wechat_msg_type_lower = wechat_msg_type.lower()
@@ -335,6 +343,7 @@ class Config:
             openai_temperature=float(os.getenv('OPENAI_TEMPERATURE', '0.7')),
             bocha_api_keys=bocha_api_keys,
             tavily_api_keys=tavily_api_keys,
+            brave_api_keys=brave_api_keys,
             serpapi_keys=serpapi_keys,
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
@@ -426,7 +435,8 @@ class Config:
         """
         # 优先从 .env 文件读取最新配置，这样即使在容器环境中修改了 .env 文件，
         # 也能获取到最新的股票列表配置
-        env_path = Path(__file__).parent.parent / '.env'
+        env_file = os.getenv("ENV_FILE")
+        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent / '.env')
         stock_list_str = ''
         if env_path.exists():
             # 直接从 .env 文件读取最新的配置
@@ -468,8 +478,8 @@ class Config:
         elif not self.gemini_api_key:
             warnings.append("提示：未配置 Gemini API Key，将使用 OpenAI 兼容 API")
         
-        if not self.bocha_api_keys and not self.tavily_api_keys and not self.serpapi_keys:
-            warnings.append("提示：未配置搜索引擎 API Key (Bocha/Tavily/SerpAPI)，新闻搜索功能将不可用")
+        if not self.bocha_api_keys and not self.tavily_api_keys and not self.brave_api_keys and not self.serpapi_keys:
+            warnings.append("提示：未配置搜索引擎 API Key (Bocha/Tavily/Brave/SerpAPI)，新闻搜索功能将不可用")
         
         # 检查通知配置
         has_notification = (
